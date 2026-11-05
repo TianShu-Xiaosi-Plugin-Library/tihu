@@ -22,6 +22,7 @@ node bin\pelican-open.mjs --domain=yaoguang --title="想测什么"
 进了沙箱会话不用再交代「这是临时环境」——插件每一轮自动注入一段：
 
 ```
+<pelican-test>
 ## 鹈鹕沙箱
 
 你在一个临时沙箱里工作，不是用户的真实项目。
@@ -33,9 +34,28 @@ node bin\pelican-open.mjs --domain=yaoguang --title="想测什么"
 可以随便试：改坏、删光、重写，都不影响用户的项目。到期后这个会话会自动归档，
 工作区移进 archive/。想提前结束就说一声（pelican_archive）。
 想在别的星域或模型上再跑一遍，用 pelican_open 开一个新的沙箱。
+</pelican-test>
 ```
 
+外面那层 `<pelican-test>` 是必须的：宿主 `promptContext.setBlock` 用 `/^<([A-Za-z][\w.-]*)[\s>/]/` 取第一个标签名并要求它以插件 id 开头，不带标签的纯 markdown 会被**静默丢弃、不报错**。插件早期版本就是纯 markdown，所以这段提示词实际从未注入成功。
+
 判断依据是会话的 cwd 落在沙箱目录下——普通项目会话一个字都不注入；沙箱归档后这一块会自动清空，不会留着过期信息。
+
+## 「鹈鹕测试」触发词
+
+在沙箱会话里输入 **「鹈鹕测试」**，插件在该轮把完整提示词塞进注入块：
+
+```
+## 鹈鹕测试
+
+用户这句「鹈鹕测试」等于请求执行下面这条完整提示词。直接开始做，不用再问要不要开工：
+
+> 创建一个HTML，内容是SVG绘制一个鹈鹕骑自行车的2D动画，你不需要任何测试。
+```
+
+- 判定宽松：句子里出现「鹈鹕测试」（中间允许空白）即命中，见 `lib/prompt.js` 的 `isPelicanTestRequest`。
+- **一次性**：只在命中那一轮注入，下一轮说别的话就收回，不会每轮重复。
+- 提示词原文存于 `lib/prompt.js` 的 `PELICAN_TEST_PROMPT`，一字不改。
 
 ## 不代劳结果
 
@@ -114,7 +134,7 @@ node bin\pelican-open.mjs --domain=yaoguang --title="想测什么"
 ## 测试
 
 ```
-node --test test/sandbox.test.js test/host-api.test.js test/plugin.test.js
+node --test test/*.test.js
 ```
 
-17 个用例，覆盖沙箱生命周期、HTTP 封装形状（用假宿主服务）、插件接线与到期归档。
+50 个用例：沙箱生命周期 10、HTTP 封装 8、插件接线 8、星域 7、提示词 17。覆盖沙箱生命周期、HTTP 封装形状（用假宿主服务）、插件接线、到期归档与「鹈鹕测试」触发。
