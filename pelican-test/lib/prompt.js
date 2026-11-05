@@ -12,6 +12,21 @@ import { DOMAINS } from './domains.js'
 
 const HOUR = 60 * 60 * 1000
 
+/**
+ * 注入块的根标签必须是插件 id。宿主 promptContext.setBlock 用 `/^<([A-Za-z][\w.-]*)[\s>/]/`
+ * 取第一个标签名，要求它以插件 id 开头，否则整块被静默丢弃（rivet-runtime 的 makePromptContext）。
+ * 不带标签的纯 markdown = 什么都没注入进去。
+ */
+const BLOCK_TAG = 'pelican-test'
+
+/** 用户说「鹈鹕测试」时塞进去的完整提示词——原话照搬，不改写。 */
+export const PELICAN_TEST_PROMPT = '创建一个HTML，内容是SVG绘制一个鹈鹕骑自行车的2D动画，你不需要任何测试。'
+
+/** 触发词判定：句子里出现「鹈鹕测试」（中间允许空白）就算。 */
+export function isPelicanTestRequest(userInput) {
+  return typeof userInput === 'string' && /鹈鹕\s*测试/.test(userInput)
+}
+
 /** 剩余时间的人话表述。 */
 export function remainingText(meta, now = Date.now()) {
   const ms = meta.expiresAt - now
@@ -69,8 +84,8 @@ export function safeModel(v) {
 }
 
 /** 注入给沙箱会话的提示块。每轮重新生成，剩余时间才是当前的。 */
-export function buildSandboxPrompt(meta, now = Date.now()) {
-  return [
+export function buildSandboxPrompt(meta, now = Date.now(), { pelicanTest = false } = {}) {
+  const lines = [
     '## 鹈鹕沙箱',
     '',
     '你在一个临时沙箱里工作，不是用户的真实项目。',
@@ -85,5 +100,16 @@ export function buildSandboxPrompt(meta, now = Date.now()) {
     '',
     '结果必须来自真实执行：没跑过的测试不要说跑过了，跑挂了就把报错原样贴出来，',
     '不要替用户总结成「测试通过」。用户要的是这次真跑出来的东西。',
-  ].join('\n')
+  ]
+  if (pelicanTest) {
+    lines.push(
+      '',
+      '## 鹈鹕测试',
+      '',
+      '用户这句「鹈鹕测试」等于请求执行下面这条完整提示词。直接开始做，不用再问要不要开工：',
+      '',
+      `> ${PELICAN_TEST_PROMPT}`,
+    )
+  }
+  return `<${BLOCK_TAG}>\n${lines.join('\n')}\n</${BLOCK_TAG}>`
 }

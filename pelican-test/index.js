@@ -22,7 +22,7 @@ import {
 import { archiveSession, createSession, readServerInfo } from './lib/host-api.js'
 import { dirname, join } from 'node:path'
 import { DOMAINS, domainLabel, domainWarning, resolveDomain } from './lib/domains.js'
-import { buildSandboxPrompt, remainingText, sandboxIdForCwd } from './lib/prompt.js'
+import { buildSandboxPrompt, isPelicanTestRequest, remainingText, sandboxIdForCwd } from './lib/prompt.js'
 
 export default defineTianshuPlugin({
   id: 'pelican-test',
@@ -137,7 +137,7 @@ export default defineTianshuPlugin({
       ],
       lifecycle: {
         /** 每轮：先把到期的沙箱归档，再给沙箱会话注入内置提示词。 */
-        async turnStart() {
+        async turnStart(event) {
           const due = expiredSandboxes(storeDir)
           for (const meta of due) {
             try {
@@ -151,7 +151,8 @@ export default defineTianshuPlugin({
 
           if (!activeSandboxId) return
           const meta = readMeta(storeDir, activeSandboxId)
-          host.promptContext?.setBlock(meta ? buildSandboxPrompt(meta) : null)
+          const pelicanTest = isPelicanTestRequest(event?.userInput)
+          host.promptContext?.setBlock(meta ? buildSandboxPrompt(meta, Date.now(), { pelicanTest }) : null)
         },
       },
     }
