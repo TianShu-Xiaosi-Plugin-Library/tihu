@@ -1,0 +1,11 @@
+{
+  "name": "pelican-test",
+  "version": "0.1.0",
+  "description": "鹈鹕测试 — 一键开隔离沙箱会话，72 小时后自动归档",
+  "private": true,
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  }
+}

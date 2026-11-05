@@ -1,0 +1,8 @@
+# 本地状态，不要提交
+.rivet/
+node_modules/
+
+# 杂项
+*.log
+.DS_Store
+Thumbs.db

@@ -1,0 +1,20 @@
+{
+  "$tpi": "1.0",
+  "kind": "tianshu.plugin",
+  "id": "pelican-test",
+  "displayName": "鹈鹕测试",
+  "version": "0.1.0",
+  "description": "一键开隔离沙箱会话：独立工作区、独立会话、72 小时后自动归档",
+  "runtime": "agent",
+  "entry": "index.js",
+  "capabilities": ["tools", "storage", "log", "promptContext"],
+  "contributes": {
+    "tools": [
+      { "name": "pelican_open", "description": "开一个新的鹈鹕测试沙箱会话（与当前项目工作区隔离）" },
+      { "name": "pelican_status", "description": "列出鹈鹕沙箱与剩余时间" },
+      { "name": "pelican_archive", "description": "立即归档一个鹈鹕沙箱" }
+    ],
+    "lifecycle": ["turnStart"]
+  },
+  "permissions": { "fs": true, "net": true, "shell": false }
+}
