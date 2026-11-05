@@ -67,7 +67,18 @@ export function listSessions(server) {
   return call(server, 'GET', '/sessions')
 }
 
-/** 宿主把「删除会话」实现为归档，返回 { archived: true }。 */
-export function archiveSession(server, id) {
-  return call(server, 'DELETE', `/sessions/${encodeURIComponent(id)}`)
+/**
+ * 宿主把「删除会话」实现为归档，返回 { archived: true }。
+ * 已经归档过的会话回 404 "Session not found or already archived"——
+ * 那是幂等成功，不是错误（重复归档不该让调用方炸掉）。
+ */
+export async function archiveSession(server, id) {
+  try {
+    return await call(server, 'DELETE', `/sessions/${encodeURIComponent(id)}`)
+  } catch (err) {
+    if (String(err.message).includes('already archived')) {
+      return { archived: true, alreadyArchived: true }
+    }
+    throw err
+  }
 }

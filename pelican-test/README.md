@@ -98,6 +98,8 @@ node bin\pelican-open.mjs --domain=yaoguang --title="想测什么"
 
 - 触发：每次 `turnStart` 惰性扫描（不依赖定时器）+ `pelican_archive` 手动
 - 动作：先 `DELETE /sessions/{id}`（天枢把删除实现为归档，回 `{"archived":true}`），再把沙箱目录移进 `archive/`
+- **已经归档过的会话再删会回 404**，按幂等成功处理，不报错
+- **目录被会话进程占用时**（Windows 上常见）不能立刻搬走：会话照样归档，沙箱 meta 标成 `pending-archive`，下一轮 `turnStart` 自动重试，不会谎称已归档
 - 保留期：`RETENTION_MS = 72h`，写死在 `lib/sandbox.js`
 
 ## 目录布局

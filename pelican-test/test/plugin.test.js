@@ -157,7 +157,7 @@ test('turnStart 把到期的沙箱连同宿主会话一起归档', async () => {
       '必须先归档宿主会话')
     assert.equal(existsSync(join(storeDir, 'pelican', 'sessions', stale.id)), false, '沙箱目录应移走')
     assert.equal(existsSync(join(storeDir, 'pelican', 'archive', stale.id)), true)
-    assert.ok(logs.some(l => l.includes('到期归档')), '归档要留日志')
+    assert.ok(logs.some(l => l.includes('已归档') && l.includes(stale.id)), '归档成功要留带沙箱 id 的日志')
   } finally { await fake.close() }
 })
 

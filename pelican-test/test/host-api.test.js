@@ -84,3 +84,19 @@ test('非 2xx 抛出带状态码的错误，不静默吞掉', async () => {
     await assert.rejects(() => createSession(host, { cwd: 'D:\\x' }), /POST \/sessions → 404/)
   } finally { await host.close() }
 })
+
+test('已归档的会话再 DELETE 回 404，按幂等成功处理而不是抛错', async () => {
+  const host = await fakeHost({
+    'DELETE /sessions/s1': { status: 404, body: { error: 'Session not found or already archived' } },
+  })
+  try {
+    assert.deepEqual(await archiveSession(host, 's1'), { archived: true, alreadyArchived: true })
+  } finally { await host.close() }
+})
+
+test('其它 404 仍然算错误，不被幂等吞掉', async () => {
+  const host = await fakeHost({ 'DELETE /sessions/s9': { status: 404, body: { error: 'nope' } } })
+  try {
+    await assert.rejects(() => archiveSession(host, 's9'), /DELETE \/sessions\/s9 → 404/)
+  } finally { await host.close() }
+})

@@ -92,3 +92,53 @@ test('listSandboxes 按创建时间倒序，空目录返回空数组', () => {
   const b = createSandbox(dataDir, { now: 1_800_000_001_000 })
   assert.deepEqual(listSandboxes(dataDir).map(m => m.id), [b.id, a.id])
 })
+
+test('工作区被占用时只标 pending-archive，不谎称已归档', async () => {
+  const { spawn } = await import('node:child_process')
+  const dataDir = tmp()
+  const now = 1_800_000_000_000
+  const meta = createSandbox(dataDir, { now })
+
+  // 真造占用：子进程把 cwd 停在 workspace 里，父目录就搬不动了
+  const child = spawn(process.execPath, ['-e', `process.chdir(${JSON.stringify(meta.workspace)}); setInterval(()=>{}, 1000)`], { stdio: 'ignore' })
+  try {
+    await new Promise(r => setTimeout(r, 500))
+    const result = archiveSandbox(dataDir, meta.id, { now: now + 1000 })
+
+    assert.equal(result.status, 'pending-archive', '搬不动就不能报已归档')
+    assert.equal(result.archivedAt, null)
+    assert.equal(result.lastArchiveAttemptAt, now + 1000)
+    assert.equal(existsSync(join(dataDir, 'pelican', 'sessions', meta.id)), true, '目录还在原地')
+    assert.equal(existsSync(join(dataDir, 'pelican', 'archive', meta.id)), false)
+  } finally {
+    child.kill()
+  }
+})
+
+test('pending 的沙箱会被再次挑出来重试，占用解除后转 archived', async () => {
+  const { spawn } = await import('node:child_process')
+  const dataDir = tmp()
+  const now = 1_800_000_000_000
+  const meta = createSandbox(dataDir, { now })
+
+  const child = spawn(process.execPath, ['-e', `process.chdir(${JSON.stringify(meta.workspace)}); setInterval(()=>{}, 1000)`], { stdio: 'ignore' })
+  await new Promise(r => setTimeout(r, 500))
+  archiveSandbox(dataDir, meta.id, { now: now + 1000 })
+  child.kill()
+  await new Promise(r => setTimeout(r, 700))
+
+  assert.deepEqual(expiredSandboxes(dataDir, now).map(m => m.id), [meta.id], 'pending 的必须进重试名单')
+
+  const retried = archiveSandbox(dataDir, meta.id, { now: now + 2000 })
+  assert.equal(retried.status, 'archived')
+  assert.equal(retried.archivedAt, now + 2000)
+  assert.equal(existsSync(join(dataDir, 'pelican', 'archive', meta.id, 'meta.json')), true)
+})
+
+test('isBusyError 只认 EPERM / EBUSY', async () => {
+  const { isBusyError } = await import('../lib/sandbox.js')
+  assert.equal(isBusyError({ code: 'EPERM' }), true)
+  assert.equal(isBusyError({ code: 'EBUSY' }), true)
+  assert.equal(isBusyError({ code: 'ENOENT' }), false)
+  assert.equal(isBusyError(null), false)
+})

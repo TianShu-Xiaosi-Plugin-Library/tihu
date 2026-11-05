@@ -84,22 +84,42 @@ export function listSandboxes(dataDir) {
     .sort((a, b) => b.createdAt - a.createdAt)
 }
 
-/** 已过期且仍 active 的沙箱。 */
+/** 该归档的沙箱：到期的 active，加上上次因占用没搬成功的 pending。 */
 export function expiredSandboxes(dataDir, now = Date.now()) {
-  return listSandboxes(dataDir).filter(m => m.status === 'active' && m.expiresAt <= now)
+  return listSandboxes(dataDir).filter(m =>
+    m.status === 'pending-archive' || (m.status === 'active' && m.expiresAt <= now),
+  )
 }
 
-/** 把沙箱移入 archive/，meta 标记为 archived 并记录时间。 */
+/** 目录被占用（Windows EPERM / 类 Unix EBUSY）时搬不动，只能下轮再试。 */
+export function isBusyError(err) {
+  return err?.code === 'EPERM' || err?.code === 'EBUSY'
+}
+
+/**
+ * 把沙箱移入 archive/。
+ * 先搬目录再写 meta——搬不动就只标 pending-archive，不谎称已归档。
+ * 返回的 meta.status 可能是 'archived' 或 'pending-archive'，调用方要分清。
+ */
 export function archiveSandbox(dataDir, id, { now = Date.now() } = {}) {
   const meta = readMeta(dataDir, id)
   if (!meta) return null
-  const next = { ...meta, status: 'archived', archivedAt: now }
-  mkdirSync(archiveDir(dataDir), { recursive: true })
-  writeMeta(dataDir, next)
   const target = join(archiveDir(dataDir), id)
   if (existsSync(target)) throw new Error(`归档目标已存在：${target}`)
-  renameSync(join(sessionsDir(dataDir), id), target)
-  return next
+  mkdirSync(archiveDir(dataDir), { recursive: true })
+
+  try {
+    renameSync(join(sessionsDir(dataDir), id), target)
+  } catch (err) {
+    if (!isBusyError(err)) throw err
+    const pending = { ...meta, status: 'pending-archive', lastArchiveAttemptAt: now }
+    writeMeta(dataDir, pending)
+    return pending
+  }
+
+  const archived = { ...meta, status: 'archived', archivedAt: now }
+  writeFileSync(join(target, 'meta.json'), JSON.stringify(archived, null, 2), 'utf8')
+  return archived
 }
 
 /**

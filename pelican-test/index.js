@@ -126,6 +126,11 @@ export default defineTianshuPlugin({
             const meta = listSandboxes(storeDir).find(m => m.id === call.args.id)
             if (!meta) return { content: `没有这个沙箱：${call.args.id}`, isError: true }
             const archived = await archiveOne(meta)
+            if (archived.status === 'pending-archive') {
+              return {
+                content: `会话已归档，但工作区被占用（可能有进程正持有它），已标记待重试：${archived.id}。下一轮会自动再试一次。`,
+              }
+            }
             return { content: `已归档 ${archived.id}（会话 ${archived.sessionId ?? '无'}，归档时间 ${new Date(archived.archivedAt).toLocaleString()}）` }
           },
         },
@@ -136,8 +141,9 @@ export default defineTianshuPlugin({
           const due = expiredSandboxes(storeDir)
           for (const meta of due) {
             try {
-              await archiveOne(meta)
-              host.log.info(`pelican: 到期归档 ${meta.id}`)
+              const result = await archiveOne(meta)
+              if (result.status === 'archived') host.log.info(`pelican: 已归档 ${meta.id}`)
+              else host.log.info(`pelican: ${meta.id} 工作区被占用，下轮再试`)
             } catch (err) {
               host.log.warn(`pelican: 归档 ${meta.id} 失败：${err.message}`)
             }
